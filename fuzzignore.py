@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 
 import argparse
+import json
 import os
+import subprocess
 import sys
-
-import requests
-from pyfzf.pyfzf import FzfPrompt
+from pathlib import Path
+from urllib.request import Request, urlopen
 
 
 def cli_args():
@@ -27,34 +28,47 @@ def cli_args():
 
 def get_template_names(auth_token: str) -> list[str]:
     templates_url = "https://api.github.com/gitignore/templates"
-    response = requests.get(
-        templates_url, headers={"Authorization": f"Bearer {auth_token}"}
+    request = Request(
+        templates_url, headers={"Authorization": f"Bearer {auth_token}"}, method="GET"
     )
-    return response.json()
+    return json.loads(urlopen(request).read().decode("utf-8"))
 
 
 def get_template(template_name: str, auth_token: str) -> str:
     template_url = f"https://api.github.com/gitignore/templates/{template_name}"
-    response = requests.get(
+    request = Request(
         template_url,
         headers={
             "Authorization": f"Bearer {auth_token}",
             "Accept": "application/vnd.github.raw+json",
         },
+        method="GET",
     )
-    return response.text
+    return urlopen(request).read().decode("utf-8")
+
+
+def write_gitignore(content: str):
+    if Path(".gitignore").exists():
+        print(".gitignore already exists")
+        sys.exit(0)
+    with open(".gitignore", "w") as f:
+        f.write(content)
+
+
+def fzf_select(templates: str):
+    echo = subprocess.Popen(["echo", templates], stdout=subprocess.PIPE)
+    ps = subprocess.Popen(["fzf", "--cycle"], stdin=echo.stdout, stdout=subprocess.PIPE)
+    selection, ret_code = ps.communicate()[0], ps.returncode
+    if ret_code != 0:
+        sys.exit(ret_code)
+    return selection.decode("utf-8").strip()
 
 
 if __name__ == "__main__":
     args = cli_args()
     auth_token = args["auth_token"]
-    template_names = get_template_names(auth_token)
-    fzf = FzfPrompt()
-    selection = fzf.prompt(template_names, "--cycle")[0]
 
-    if not selection:
-        sys.exit(0)
-
+    template_names = "\n".join(get_template_names(auth_token))
+    selection = fzf_select(template_names)
     content = get_template(selection, auth_token)
-    with open(".gitignore", "w") as f:
-        f.write(content)
+    write_gitignore(content)

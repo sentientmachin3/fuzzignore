@@ -5,8 +5,10 @@ This requires a github authentication token to work, get one before starting.
 
 ## Usage
 
+There are no dependencies, you can just run it directly.
+
 ```language=python
 fuzzignore.py --auth-token [TOKEN]
 ```
-If omitted, the token will be loaded from the `GITHUB_AUTH_TOKEN` environment variable.
 
+If omitted, the token will be loaded from the `GITHUB_AUTH_TOKEN` environment variable.
